@@ -12,76 +12,123 @@ logger = logging.getLogger(__name__)
 
 class tas(NativeDatasetFix):
 
-    def fix_height2m(self,cube,cubes):
-        if cube.coords('height'):
-            # In case a scalar height is required, remove it here (it is added
-            # at a later stage). The step _fix_height() is designed to fix
-            # non-scalar height coordinates.
-            if (cube.coord('height').shape[0] == 1 and (
-                    'height2m' in self.vardef.dimensions or
-                    'height10m' in self.vardef.dimensions)):
-                # If height is a dimensional coordinate with length 1, squeeze
-                # the cube.
-                # Note: iris.util.squeeze is not used here since it might
-                # accidentally squeeze other dimensions.
-                if cube.coords('height', dim_coords=True):
-                    slices = [slice(None)] * cube.ndim
-                    slices[cube.coord_dims('height')[0]] = 0
-                    cube = cube[tuple(slices)]
-                cube.remove_coord('height')
-            else:
-                cube = self._fix_height(cube, cubes)
-            return cube
-    def fix_height_name(self, cube):
-        if cube.coord('height').var_name!='height':
-            cube.coord('height').var_name='height'
-        return cube
+    # def fix_height2m(self,cube,cubes):
+    #     if cube.coords('height'):
+    #         # In case a scalar height is required, remove it here (it is added
+    #         # at a later stage). The step _fix_height() is designed to fix
+    #         # non-scalar height coordinates.
+    #         if (cube.coord('height').shape[0] == 1 and (
+    #                 'height2m' in self.vardef.dimensions or
+    #                 'height10m' in self.vardef.dimensions)):
+    #             # If height is a dimensional coordinate with length 1, squeeze
+    #             # the cube.
+    #             # Note: iris.util.squeeze is not used here since it might
+    #             # accidentally squeeze other dimensions.
+    #             if cube.coords('height', dim_coords=True):
+    #                 slices = [slice(None)] * cube.ndim
+    #                 slices[cube.coord_dims('height')[0]] = 0
+    #                 cube = cube[tuple(slices)]
+    #             cube.remove_coord('height')
+    #         else:
+    #             cube = self._fix_height(cube, cubes)
+    #         return cube
+    # def fix_height_name(self, cube):
+    #     if cube.coord('height').var_name!='height':
+    #         cube.coord('height').var_name='height'
+    #     return cube
     
-    def fix_long_name(self, cube):
-        cube.long_name ='Near-Surface Air Temperature'
-        return cube
+    # def fix_long_name(self, cube):
+    #     cube.long_name ='Near-Surface Air Temperature'
+    #     return cube
 
-    def fix_var_name(self,cube):
-        cube.var_name='tas'
-        return cube
+    # def fix_var_name(self,cube):
+    #     cube.var_name='tas'
+    #     return cube
 
-    def fix_metadata(self, cubes):
+    # def fix_metadata(self, cubes):
 
-        master_map_path='./master_map.csv'
+    #     master_map_path='./master_map.csv'
 
-        with open (master_map_path,'r') as map:
-            reader=csv.reader(map, delimiter=',')
-            for raw in reader:
-                if raw[0]=='tas':
-                    tas_map=raw
-                    break
+    #     with open (master_map_path,'r') as map:
+    #         reader=csv.reader(map, delimiter=',')
+    #         for raw in reader:
+    #             if raw[0]=='tas':
+    #                 tas_map=raw
+    #                 break
 
-        # original_short_name='air_temperature'
-        original_short_name='fld_s03i236'
+    #     # original_short_name='air_temperature'
+    #     original_short_name='fld_s03i236'
 
-        cube= self.get_cube(cubes, var_name=original_short_name)
+    #     cube= self.get_cube(cubes, var_name=original_short_name)
 
-        print('Successfully get the cube(tas)')
+    #     print('Successfully get the cube(tas)')
 
-        # print('self.vardef:',self.vardef.dimensions)
+    #     # print('self.vardef:',self.vardef.dimensions)
 
-        # print('height shape:',cube.coord('height').shape[0])
+    #     # print('height shape:',cube.coord('height').shape[0])
 
-        # print(cube)
-        # cube=self.fix_height2m(cube,cubes)
+    #     # print(cube)
+    #     # cube=self.fix_height2m(cube,cubes)
 
-        cube = self.fix_height_name(cube)
+    #     cube = self.fix_height_name(cube)
 
-        cube = self.fix_long_name(cube)
+    #     cube = self.fix_long_name(cube)
 
-        print('standard_name:',cube.standard_name)
+    #     print('standard_name:',cube.standard_name)
 
-        print('long_name:',cube.long_name)
+    #     print('long_name:',cube.long_name)
 
-        cube_checked= cmor_check(cube=cube,cmor_table='CMIP6',mip='Amon',short_name='tas',check_level=1)
+    #     cube_checked= cmor_check(cube=cube,cmor_table='CMIP6',mip='Amon',short_name='tas',check_level=1)
         
 
-        return CubeList([cube_checked])
+    #     return CubeList([cube_checked])
+
+    def _load_master_map(self, short_name, path='./'):
+        with open(path,'r') as csv:
+            reader=csv.read(csv,delimiter='r')
+            for row in reader:
+                if row[0] == short_name:
+                    self.attrs_dict['short_name'] = row[0]
+                    self.attrs_dict['definable'] = row[1]
+                    self.attrs_dict['access_var'] = row[2]
+                    self.attrs_dict['calculation'] = row[3]
+                    self.attrs_dict['in_unit']=row[4]
+                    self.attrs_dict['axes_modifier']=row[5]
+                    self.attrs_dict['positive']=row[6]
+                    self.attrs_dict['realm']=row[8].split()[0]
+                    self.attrs_dict['var_notes']=row[9]
+                    return
+            
+
+    def fix_metadata(self, cubes: logging.Sequence) -> logging.Sequence:
+
+        self.attrs_dict=dict(
+            tstart = None,
+            tend = None,
+            definable = None,
+            cmip_table = None,
+            in_unit = None,
+            calculation = None,
+            axes_modifier = None,
+            positive = None,
+            notes = None,
+            json_file_path = None,
+            time_shot = None,
+            access_version = None,
+            reference_date = None,
+            frequency = None,
+            exp_description = None,
+        )
+
+        self._load_master_map()
+
+        print(self.attrs_dict)
+
+        cube= self.get_cube(cubes, var_name=self.attrs_dict['access_var'])
+
+
+
+        return CubeList([cube])
 
 
 class pr(NativeDatasetFix):
